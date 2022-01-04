@@ -11,8 +11,7 @@ import tensorflow_model_optimization as tfmot
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--model', type=str, required=True, help='model name')
-#parser.add_argument('--mfcc', action='store_true', help='use MFCCs')
+parser.add_argument('--version', type=str, required=True, help='model name')
 args = parser.parse_args()
 
 
@@ -157,59 +156,60 @@ val_ds = generator.make_dataset(val_files, False)
 test_ds = generator.make_dataset(test_files, False)
 
 units = 8
-        
-mlp = tf.keras.Sequential([
-            tf.keras.layers.Flatten(),
-            tf.keras.layers.Dense(units=256, activation='relu'),
-            tf.keras.layers.Dense(units=256, activation='relu'),
-            tf.keras.layers.Dense(units=256, activation='relu'),
-            tf.keras.layers.Dense(units=units)])    
-    
-cnn = tf.keras.Sequential([
-            tf.keras.layers.Conv2D(filters=128, kernel_size=[3, 3], strides=strides, use_bias=False),
-            tf.keras.layers.BatchNormalization(momentum=0.1),
-            tf.keras.layers.ReLU(),
-            tf.keras.layers.Conv2D(filters=128, kernel_size=[3, 3], strides=[1, 1], use_bias=False),
-            tf.keras.layers.BatchNormalization(momentum=0.1),
-            tf.keras.layers.ReLU(),
-            tf.keras.layers.Conv2D(filters=128, kernel_size=[3, 3], strides=[1, 1], use_bias=False),
-            tf.keras.layers.BatchNormalization(momentum=0.1),
-            tf.keras.layers.ReLU(),
-            tf.keras.layers.GlobalAveragePooling2D(),
-            tf.keras.layers.Dense(units=units)
-])  
 
-dscnn = tf.keras.Sequential([
-            tf.keras.layers.Conv2D(filters=256, kernel_size=[3, 3], strides=strides, use_bias=False),
-            tf.keras.layers.BatchNormalization(momentum=0.1),
-            tf.keras.layers.ReLU(),
-            tf.keras.layers.DepthwiseConv2D(kernel_size=[3, 3], strides=[1, 1], use_bias=False),
-            tf.keras.layers.Conv2D(filters=256, kernel_size=[1, 1], strides=[1, 1], use_bias=False),
-            tf.keras.layers.BatchNormalization(momentum=0.1),
-            tf.keras.layers.ReLU(),
-            tf.keras.layers.DepthwiseConv2D(kernel_size=[3, 3], strides=[1, 1], use_bias=False),
-            tf.keras.layers.Conv2D(filters=256, kernel_size=[1, 1], strides=[1, 1], use_bias=False),
-            tf.keras.layers.BatchNormalization(momentum=0.1),
-            tf.keras.layers.ReLU(),
-            tf.keras.layers.GlobalAveragePooling2D(),
-            tf.keras.layers.Dense(units=units)
-]) 
+if args.version == 'a':
+    # dscnn
+    model_name = "Group3_kws_a.tflite.zip"  
+    model = tf.keras.Sequential([
+                tf.keras.layers.Conv2D(filters=256, kernel_size=[3, 3], strides=strides, use_bias=False),
+                tf.keras.layers.BatchNormalization(momentum=0.1),
+                tf.keras.layers.ReLU(),
+                tf.keras.layers.DepthwiseConv2D(kernel_size=[3, 3], strides=[1, 1], use_bias=False),
+                tf.keras.layers.Conv2D(filters=256, kernel_size=[1, 1], strides=[1, 1], use_bias=False),
+                tf.keras.layers.BatchNormalization(momentum=0.1),
+                tf.keras.layers.ReLU(),
+                tf.keras.layers.DepthwiseConv2D(kernel_size=[3, 3], strides=[1, 1], use_bias=False),
+                tf.keras.layers.Conv2D(filters=256, kernel_size=[1, 1], strides=[1, 1], use_bias=False),
+                tf.keras.layers.BatchNormalization(momentum=0.1),
+                tf.keras.layers.ReLU(),
+                tf.keras.layers.GlobalAveragePooling2D(),
+                tf.keras.layers.Dense(units=units)  
+    ])
+if args.version == 'b':
+    # dscnn + magnitude base pruning (unstructured pruning)
+    model_name = "Group3_kws_b.tflite.zip"  
+    model = tf.keras.Sequential([
+                tf.keras.layers.Conv2D(filters=256, kernel_size=[3, 3], strides=strides, use_bias=False),
+                tf.keras.layers.BatchNormalization(momentum=0.1),
+                tf.keras.layers.ReLU(),
+                tf.keras.layers.DepthwiseConv2D(kernel_size=[3, 3], strides=[1, 1], use_bias=False),
+                tf.keras.layers.Conv2D(filters=256, kernel_size=[1, 1], strides=[1, 1], use_bias=False),
+                tf.keras.layers.BatchNormalization(momentum=0.1),
+                tf.keras.layers.ReLU(),
+                tf.keras.layers.DepthwiseConv2D(kernel_size=[3, 3], strides=[1, 1], use_bias=False),
+                tf.keras.layers.Conv2D(filters=256, kernel_size=[1, 1], strides=[1, 1], use_bias=False),
+                tf.keras.layers.BatchNormalization(momentum=0.1),
+                tf.keras.layers.ReLU(),
+                tf.keras.layers.GlobalAveragePooling2D(),
+                tf.keras.layers.Dense(units=units)  
+    ])     
 
-MODELS = {'mlp': mlp, 'cnn': cnn, 'dscnn': dscnn}
-
-model = MODELS[args.model]
-
+# Compile the model
 loss = tf.losses.SparseCategoricalCrossentropy(from_logits=True)
 optimizer = tf.optimizers.Adam()
 metrics = [tf.metrics.SparseCategoricalAccuracy()]
-
 model.compile(loss=loss, optimizer=optimizer, metrics=metrics)
 
-model.fit(train_ds, epochs=30, validation_data=val_ds)
-    
+
+# Train the model
+if args.version == 'a':
+    model.fit(train_ds, epochs=30, validation_data=val_ds)    
 print(model.summary())
 
+
+# Evaluate the model
 loss, error = model.evaluate(test_ds)
+
 
 # Weights clustering
 clustered_model = tfmot.clustering.keras.cluster_weights(
@@ -220,15 +220,16 @@ clustered_model = tfmot.clustering.keras.cluster_weights(
 
 model = tfmot.clustering.keras.strip_clustering(clustered_model)
 
-saved_model_dir = os.path.join('.', 'models', '{}'.format(args.model))
+saved_model_dir = os.path.join('.', 'models', '{}'.format(model_name))
 model.save(saved_model_dir)
 
 # Converting saved model to TFLite model
 converter = tf.lite.TFLiteConverter.from_saved_model(saved_model_dir)
 tflite_model = converter.convert()
 
-name_tflite_model = 'model_tflite_{}'.format(args.model)
-
+# Saving the TFLite model on disk
+#name_tflite_model = 'model_tflite_{}'.format(model_name)
+name_tflite_model = model_name
 with open(name_tflite_model, 'wb') as f:
     f.write(tflite_model)
 
@@ -241,14 +242,14 @@ def representative_dataset_gen():
     for x, _ in train_ds.take(1000):
         yield [x]
 
-# Post training quantization
+# Post training quantization weight + activations
 converter = tf.lite.TFLiteConverter.from_saved_model(saved_model_dir)
-
 converter.optimizations = [tf.lite.Optimize.DEFAULT]
 converter.representative_dataset = representative_dataset_gen
-
 tflite_quant_model = converter.convert()
-name_tflite_model_quant = 'model_tflite_quant_{}'.format(args.model)
+
+# Compressing the TFLite quantized model    
+name_tflite_model_quant = 'model_tflite_quant_{}'.format(model_name)
 with open(name_tflite_model_quant, 'wb') as f:
     tflite_compressed = zlib.compress(tflite_quant_model)
     f.write(tflite_compressed)
