@@ -228,8 +228,7 @@ converter = tf.lite.TFLiteConverter.from_saved_model(saved_model_dir)
 tflite_model = converter.convert()
 
 # Saving the TFLite model on disk
-#name_tflite_model = 'model_tflite_{}'.format(model_name)
-name_tflite_model = model_name
+name_tflite_model = '{}_original'.format(model_name)
 with open(name_tflite_model, 'wb') as f:
     f.write(tflite_model)
 
@@ -249,7 +248,7 @@ converter.representative_dataset = representative_dataset_gen
 tflite_quant_model = converter.convert()
 
 # Compressing the TFLite quantized model    
-name_tflite_model_quant = 'model_tflite_quant_{}'.format(model_name)
+name_tflite_model_quant = model_name
 with open(name_tflite_model_quant, 'wb') as f:
     tflite_compressed = zlib.compress(tflite_quant_model)
     f.write(tflite_compressed)
@@ -277,9 +276,8 @@ for elem in test_ds:
 
     predicted = interpreter.get_tensor(output_details[0]['index'])
     index = np.argmax(predicted[0])
-    #print('Predicted label:', LABELS[index])
-    #print('True label:', LABELS[elem[1][0]])
     
+    # the index predicted is equal to the index of the true label in test_ds elem[1][0]
     if index==elem[1][0]:
         correct+=1.0
     total +=1.0
