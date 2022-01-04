@@ -162,7 +162,8 @@ if args.version == 'a':
         'lower_frequency': 20, 'upper_frequency': 4000, 'num_mel_bins': 40,
         'num_coefficients': 10}
     # dscnn
-    model_name = "Group3_kws_a.tflite.zip"  
+    model_name = "Group3_kws_a.tflite.zip"
+    model_name_nozip = "Group3_kws_a.tflite"
     model = tf.keras.Sequential([
                 tf.keras.layers.Conv2D(filters=256, kernel_size=[3, 3], strides=strides, use_bias=False),
                 tf.keras.layers.BatchNormalization(momentum=0.1),
@@ -182,8 +183,9 @@ if args.version == 'b':
     MFCC_OPTIONS = {'frame_length': 640, 'frame_step': 320, 'mfcc': True,
         'lower_frequency': 20, 'upper_frequency': 4000, 'num_mel_bins': 40,
         'num_coefficients': 10}
-    # dscnn + magnitude base pruning (unstructured pruning) 
-    model_name = "Group3_kws_b.tflite.zip"  
+    # dscnn + width multiplier (structured pruning) 
+    model_name = "Group3_kws_b.tflite.zip" 
+    model_name_nozip = "Group3_kws_b.tflite"
     alpha = 0.5
     model = tf.keras.Sequential([
                 tf.keras.layers.Conv2D(filters=int(256*alpha), kernel_size=[3, 3], strides=strides, use_bias=False),
@@ -203,27 +205,14 @@ if args.version == 'b':
                 tf.keras.layers.GlobalAveragePooling2D(),
                 tf.keras.layers.Dense(units=units)  
     ]) 
-
-    #pruning_params = {'pruning_schedule':
-    #                         tfmot.sparsity.keras.PolynomialDecay(
-    #                            initial_sparsity=0.30,
-    #                            final_sparsity=0.8,
-    #                            begin_step=len(train_ds)*5,
-    #                            end_step=len(train_ds)*15
-    #                        )
-    #                  tfmot.sparsity.keras.ConstantSparsity(
-    #                               target_sparsity=0.8, begin_step=0, end_step=-1, frequency=100
-    #                            )
-    #                 }
-    #prune_low_magnitude = tfmot.sparsity.keras.prune_low_magnitude
-    #model = prune_low_magnitude(model, **pruning_params)
 if args.version == 'c':
     MFCC_OPTIONS = {'frame_length': 640, 'frame_step': 320, 'mfcc': True,
         'lower_frequency': 20, 'upper_frequency': 4000, 'num_mel_bins': 40,
         'num_coefficients': 10}
-    # dscnn + magnitude base pruning (unstructured pruning) 
-    model_name = "Group3_kws_b.tflite.zip"  
-    alpha = 0.4
+    # dscnn + width multiplier (structured pruning) 
+    model_name = "Group3_kws_c.tflite.zip"  
+    model_name_nozip = "Group3_kws_c.tflite"
+    alpha = 0.38
     model = tf.keras.Sequential([
                 tf.keras.layers.Conv2D(filters=int(256*alpha), kernel_size=[3, 3], strides=strides, use_bias=False),
                 tf.keras.layers.BatchNormalization(momentum=0.1),
@@ -242,7 +231,21 @@ if args.version == 'c':
                 tf.keras.layers.GlobalAveragePooling2D(),
                 tf.keras.layers.Dense(units=units)  
     ]) 
-    
+    pruning_params = {'pruning_schedule':
+                                   tfmot.sparsity.keras.ConstantSparsity(
+                                   target_sparsity=0.14
+                                       , begin_step=0, end_step=-1, frequency=100
+                                )
+                     }
+    #                         tfmot.sparsity.keras.PolynomialDecay(
+    #                            initial_sparsity=0.30,
+    #                            final_sparsity=0.8,
+    #                            begin_step=len(train_ds)*5,
+    #                            end_step=len(train_ds)*15
+    #                        )
+
+    prune_low_magnitude = tfmot.sparsity.keras.prune_low_magnitude
+    model = prune_low_magnitude(model, **pruning_params)
 
 # Compile the model
 loss = tf.losses.SparseCategoricalCrossentropy(from_logits=True)
@@ -258,28 +261,40 @@ if args.version == 'a':
 if args.version == 'b':
     model.compile(loss=loss, optimizer=optimizer, metrics=metrics)
     model.fit(train_ds, epochs=100, validation_data=val_ds)  
-if args.version == 'c':
-    model.compile(loss=loss, optimizer=optimizer, metrics=metrics)
-    model.fit(train_ds, epochs=100, validation_data=val_ds)
+#if args.version == 'c':
+#    model.compile(loss=loss, optimizer=optimizer, metrics=metrics)
+#    model.fit(train_ds, epochs=100, validation_data=val_ds)
 
-print(model.summary())
+#print(model.summary())
 # Evaluate the model
-loss, error = model.evaluate(test_ds)
+#loss, error = model.evaluate(test_ds)
     
 # Weights clustering
 if args.version == 'a':
-    clustered_model = tfmot.clustering.keras.cluster_weights(
+    model = tfmot.clustering.keras.cluster_weights(
                 model,
                 number_of_clusters=25,
                 cluster_centroids_init = tfmot.clustering.keras.CentroidInitialization.LINEAR
     )
+    print(model.summary())
+    # Evaluate the model
+    loss, error = model.evaluate(test_ds)
 if args.version == 'b':
-        clustered_model = model
+    print(model.summary())
+    # Evaluate the model
+    loss, error = model.evaluate(test_ds)
 if args.version == 'c':
-        clustered_model = model        
+    model.compile(loss=loss, optimizer=optimizer, metrics=metrics)
+    callbacks = [tfmot.sparsity.keras.UpdatePruningStep()]
+    input_shape = [32, 49, 10, 1]
+    model.build(input_shape)
+    model.fit(train_ds, epochs=100, validation_data=val_ds, callbacks=callbacks)
+    print(model.summary())
+    # Evaluate the model
+    loss, error = model.evaluate(test_ds)
+    model = tfmot.sparsity.keras.strip_pruning(model)       
         
-
-model = tfmot.clustering.keras.strip_clustering(clustered_model)
+model = tfmot.clustering.keras.strip_clustering(model)
 
 saved_model_dir = os.path.join('.', 'models', '{}'.format(model_name))
 model.save(saved_model_dir)
@@ -314,6 +329,9 @@ with open(name_tflite_model_quant, 'wb') as f:
     tflite_compressed = zlib.compress(tflite_quant_model)
     f.write(tflite_compressed)
     
+with open(model_name_nozip, 'wb') as f:
+    f.write(tflite_quant_model)
+    
 # Loading TFLite model    
 tflite_decompressed = open(name_tflite_model_quant, 'rb').read()
 tflite_decompressed = zlib.decompress(tflite_decompressed)    
@@ -344,5 +362,6 @@ for elem in test_ds:
     total +=1.0
 print()    
 print("TFLite quantized accuracy: " + str('{0:.10f}'.format(correct/total)))    
-print("tflite quantized model size: ", os.path.getsize(name_tflite_model_quant))
+print("tflite quantized model size: ", os.path.getsize(model_name_nozip))
+print("tflite quantized model size zipped: ", os.path.getsize(name_tflite_model_quant))
 print()
