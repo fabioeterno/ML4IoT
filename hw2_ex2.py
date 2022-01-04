@@ -186,7 +186,7 @@ if args.version == 'b':
     # dscnn + width multiplier (structured pruning) 
     model_name = "Group3_kws_b.tflite.zip" 
     model_name_nozip = "Group3_kws_b.tflite"
-    alpha = 0.5
+    alpha = 0.47
     model = tf.keras.Sequential([
                 tf.keras.layers.Conv2D(filters=int(256*alpha), kernel_size=[3, 3], strides=strides, use_bias=False),
                 tf.keras.layers.BatchNormalization(momentum=0.1),
