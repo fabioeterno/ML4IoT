@@ -184,19 +184,22 @@ if args.version == 'b':
         'num_coefficients': 10}
     # dscnn + magnitude base pruning (unstructured pruning) 
     model_name = "Group3_kws_b.tflite.zip"  
-    alpha = 0.99
+    alpha = 0.5
     model = tf.keras.Sequential([
                 tf.keras.layers.Conv2D(filters=int(256*alpha), kernel_size=[3, 3], strides=strides, use_bias=False),
                 tf.keras.layers.BatchNormalization(momentum=0.1),
                 tf.keras.layers.ReLU(),
+                tf.keras.layers.Dropout(0.5),
                 tf.keras.layers.DepthwiseConv2D(kernel_size=[3, 3], strides=[1, 1], use_bias=False),
                 tf.keras.layers.Conv2D(filters=int(256*alpha), kernel_size=[1, 1], strides=[1, 1], use_bias=False),
                 tf.keras.layers.BatchNormalization(momentum=0.1),
                 tf.keras.layers.ReLU(),
+                tf.keras.layers.Dropout(0.5),
                 tf.keras.layers.DepthwiseConv2D(kernel_size=[3, 3], strides=[1, 1], use_bias=False),
                 tf.keras.layers.Conv2D(filters=int(256*alpha), kernel_size=[1, 1], strides=[1, 1], use_bias=False),
                 tf.keras.layers.BatchNormalization(momentum=0.1),
                 tf.keras.layers.ReLU(),
+                tf.keras.layers.Dropout(0.5),
                 tf.keras.layers.GlobalAveragePooling2D(),
                 tf.keras.layers.Dense(units=units)  
     ]) 
@@ -232,7 +235,7 @@ if args.version == 'a':
     loss, error = model.evaluate(test_ds)
 if args.version == 'b':
     model.compile(loss=loss, optimizer=optimizer, metrics=metrics)
-    model.fit(train_ds, epochs=20, validation_data=val_ds)
+    model.fit(train_ds, epochs=100, validation_data=val_ds)
     print(model.summary())
     # Evaluate the model
     loss, error = model.evaluate(test_ds)  
@@ -254,12 +257,14 @@ if args.version == 'a':
                 number_of_clusters=25,
                 cluster_centroids_init = tfmot.clustering.keras.CentroidInitialization.LINEAR
     )
-#if args.version == 'b':
-#        clustered_model = tfmot.clustering.keras.cluster_weights(
-#                model,
-#                number_of_clusters=25,
-#                cluster_centroids_init = tfmot.clustering.keras.CentroidInitialization.LINEAR
-#    )
+if args.version == 'b':
+    #    clustered_model = tfmot.clustering.keras.cluster_weights(
+    #            model,
+    #            number_of_clusters=100,
+    #            cluster_centroids_init = tfmot.clustering.keras.CentroidInitialization.LINEAR
+    #)
+        clustered_model = model
+    
     
 
 model = tfmot.clustering.keras.strip_clustering(clustered_model)
