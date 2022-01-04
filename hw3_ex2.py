@@ -158,6 +158,9 @@ test_ds = generator.make_dataset(test_files, False)
 units = 8
 
 if args.version == 'a':
+    MFCC_OPTIONS = {'frame_length': 640, 'frame_step': 320, 'mfcc': True,
+        'lower_frequency': 20, 'upper_frequency': 4000, 'num_mel_bins': 40,
+        'num_coefficients': 10}
     # dscnn
     model_name = "Group3_kws_a.tflite.zip"  
     model = tf.keras.Sequential([
@@ -176,47 +179,88 @@ if args.version == 'a':
                 tf.keras.layers.Dense(units=units)  
     ])
 if args.version == 'b':
-    # dscnn + magnitude base pruning (unstructured pruning)
+    MFCC_OPTIONS = {'frame_length': 640, 'frame_step': 320, 'mfcc': True,
+        'lower_frequency': 20, 'upper_frequency': 4000, 'num_mel_bins': 40,
+        'num_coefficients': 10}
+    # dscnn + magnitude base pruning (unstructured pruning) 
     model_name = "Group3_kws_b.tflite.zip"  
+    alpha = 0.99
     model = tf.keras.Sequential([
-                tf.keras.layers.Conv2D(filters=256, kernel_size=[3, 3], strides=strides, use_bias=False),
+                tf.keras.layers.Conv2D(filters=int(256*alpha), kernel_size=[3, 3], strides=strides, use_bias=False),
                 tf.keras.layers.BatchNormalization(momentum=0.1),
                 tf.keras.layers.ReLU(),
                 tf.keras.layers.DepthwiseConv2D(kernel_size=[3, 3], strides=[1, 1], use_bias=False),
-                tf.keras.layers.Conv2D(filters=256, kernel_size=[1, 1], strides=[1, 1], use_bias=False),
+                tf.keras.layers.Conv2D(filters=int(256*alpha), kernel_size=[1, 1], strides=[1, 1], use_bias=False),
                 tf.keras.layers.BatchNormalization(momentum=0.1),
                 tf.keras.layers.ReLU(),
                 tf.keras.layers.DepthwiseConv2D(kernel_size=[3, 3], strides=[1, 1], use_bias=False),
-                tf.keras.layers.Conv2D(filters=256, kernel_size=[1, 1], strides=[1, 1], use_bias=False),
+                tf.keras.layers.Conv2D(filters=int(256*alpha), kernel_size=[1, 1], strides=[1, 1], use_bias=False),
                 tf.keras.layers.BatchNormalization(momentum=0.1),
                 tf.keras.layers.ReLU(),
                 tf.keras.layers.GlobalAveragePooling2D(),
                 tf.keras.layers.Dense(units=units)  
-    ])     
+    ]) 
+
+    #pruning_params = {'pruning_schedule':
+    #                         tfmot.sparsity.keras.PolynomialDecay(
+    #                            initial_sparsity=0.30,
+    #                            final_sparsity=0.8,
+    #                            begin_step=len(train_ds)*5,
+    #                            end_step=len(train_ds)*15
+    #                        )
+    #                  tfmot.sparsity.keras.ConstantSparsity(
+    #                               target_sparsity=0.8, begin_step=0, end_step=-1, frequency=100
+    #                            )
+    #                 }
+    #prune_low_magnitude = tfmot.sparsity.keras.prune_low_magnitude
+    #model = prune_low_magnitude(model, **pruning_params)
+    
 
 # Compile the model
 loss = tf.losses.SparseCategoricalCrossentropy(from_logits=True)
 optimizer = tf.optimizers.Adam()
 metrics = [tf.metrics.SparseCategoricalAccuracy()]
-model.compile(loss=loss, optimizer=optimizer, metrics=metrics)
+
 
 
 # Train the model
 if args.version == 'a':
-    model.fit(train_ds, epochs=30, validation_data=val_ds)    
-print(model.summary())
-
-
-# Evaluate the model
-loss, error = model.evaluate(test_ds)
-
-
+    model.compile(loss=loss, optimizer=optimizer, metrics=metrics)
+    model.fit(train_ds, epochs=30, validation_data=val_ds)   
+    print(model.summary())
+    # Evaluate the model
+    loss, error = model.evaluate(test_ds)
+if args.version == 'b':
+    model.compile(loss=loss, optimizer=optimizer, metrics=metrics)
+    model.fit(train_ds, epochs=20, validation_data=val_ds)
+    print(model.summary())
+    # Evaluate the model
+    loss, error = model.evaluate(test_ds)  
+if args.version == 'c':
+    model.compile(loss=loss, optimizer=optimizer, metrics=metrics)
+    callbacks = [tfmot.sparsity.keras.UpdatePruningStep()]
+    input_shape = [32, 49, 10, 1]
+    model.build(input_shape)
+    model.fit(train_ds, epochs=20, validation_data=val_ds, callbacks=callbacks)
+    print(model.summary())
+    # Evaluate the model
+    loss, error = model.evaluate(test_ds)
+    model = tfmot.sparsity.keras.strip_pruning(model)
+    
 # Weights clustering
-clustered_model = tfmot.clustering.keras.cluster_weights(
-            model,
-            number_of_clusters=25,
-            cluster_centroids_init = tfmot.clustering.keras.CentroidInitialization.LINEAR
-)
+if args.version == 'a':
+    clustered_model = tfmot.clustering.keras.cluster_weights(
+                model,
+                number_of_clusters=25,
+                cluster_centroids_init = tfmot.clustering.keras.CentroidInitialization.LINEAR
+    )
+#if args.version == 'b':
+#        clustered_model = tfmot.clustering.keras.cluster_weights(
+#                model,
+#                number_of_clusters=25,
+#                cluster_centroids_init = tfmot.clustering.keras.CentroidInitialization.LINEAR
+#    )
+    
 
 model = tfmot.clustering.keras.strip_clustering(clustered_model)
 
