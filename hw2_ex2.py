@@ -150,7 +150,7 @@ strides = [2, 1]
 #    strides = [2, 2]
 
 
-generator = SignalGenerator(LABELS, 16000, **options)
+generator = SignalGenerator(LABELS, 16000, **options)  
 train_ds = generator.make_dataset(train_files, True)
 val_ds = generator.make_dataset(val_files, False)
 test_ds = generator.make_dataset(test_files, False)
@@ -212,31 +212,31 @@ if args.version == 'c':
     # dscnn + width multiplier (structured pruning) 
     model_name = "Group3_kws_c.tflite.zip"  
     model_name_nozip = "Group3_kws_c.tflite"
-    alpha = 0.38
+    alpha = 0.26
     model = tf.keras.Sequential([
                 tf.keras.layers.Conv2D(filters=int(256*alpha), kernel_size=[3, 3], strides=strides, use_bias=False),
                 tf.keras.layers.BatchNormalization(momentum=0.1),
                 tf.keras.layers.ReLU(),
-                tf.keras.layers.Dropout(0.5),
+                tf.keras.layers.Dropout(0.4),
                 tf.keras.layers.DepthwiseConv2D(kernel_size=[3, 3], strides=[1, 1], use_bias=False),
                 tf.keras.layers.Conv2D(filters=int(256*alpha), kernel_size=[1, 1], strides=[1, 1], use_bias=False),
                 tf.keras.layers.BatchNormalization(momentum=0.1),
                 tf.keras.layers.ReLU(),
-                tf.keras.layers.Dropout(0.5),
+                tf.keras.layers.Dropout(0.4),
                 tf.keras.layers.DepthwiseConv2D(kernel_size=[3, 3], strides=[1, 1], use_bias=False),
                 tf.keras.layers.Conv2D(filters=int(256*alpha), kernel_size=[1, 1], strides=[1, 1], use_bias=False),
                 tf.keras.layers.BatchNormalization(momentum=0.1),
                 tf.keras.layers.ReLU(),
-                tf.keras.layers.Dropout(0.5),
+                tf.keras.layers.Dropout(0.4),
                 tf.keras.layers.GlobalAveragePooling2D(),
                 tf.keras.layers.Dense(units=units)  
     ]) 
-    pruning_params = {'pruning_schedule':
-                                   tfmot.sparsity.keras.ConstantSparsity(
-                                   target_sparsity=0.14
-                                       , begin_step=0, end_step=-1, frequency=100
-                                )
-                     }
+    #pruning_params = {'pruning_schedule':
+    #                               tfmot.sparsity.keras.ConstantSparsity(
+    #                               target_sparsity=0.14
+    #                                   , begin_step=0, end_step=-1, frequency=100
+    #                            )
+    #                 }
     #                         tfmot.sparsity.keras.PolynomialDecay(
     #                            initial_sparsity=0.30,
     #                            final_sparsity=0.8,
@@ -244,8 +244,8 @@ if args.version == 'c':
     #                            end_step=len(train_ds)*15
     #                        )
 
-    prune_low_magnitude = tfmot.sparsity.keras.prune_low_magnitude
-    model = prune_low_magnitude(model, **pruning_params)
+    #prune_low_magnitude = tfmot.sparsity.keras.prune_low_magnitude
+    #model = prune_low_magnitude(model, **pruning_params)
 
 # Compile the model
 loss = tf.losses.SparseCategoricalCrossentropy(from_logits=True)
@@ -286,14 +286,15 @@ if args.version == 'b':
     loss, error = model.evaluate(test_ds)
 if args.version == 'c':
     model.compile(loss=loss, optimizer=optimizer, metrics=metrics)
-    callbacks = [tfmot.sparsity.keras.UpdatePruningStep()]
-    input_shape = [32, 49, 10, 1]
-    model.build(input_shape)
-    model.fit(train_ds, epochs=100, validation_data=val_ds, callbacks=callbacks)
+    #callbacks = [tfmot.sparsity.keras.UpdatePruningStep()]
+    #input_shape = [32, 49, 10, 1]
+    #model.build(input_shape)
+    #model.fit(train_ds, epochs=100, validation_data=val_ds, callbacks=callbacks)
+    model.fit(train_ds, epochs=300, validation_data=val_ds)
     print(model.summary())
     # Evaluate the model
     loss, error = model.evaluate(test_ds)
-    model = tfmot.sparsity.keras.strip_pruning(model)       
+    #model = tfmot.sparsity.keras.strip_pruning(model)       
 
 saved_model_dir = os.path.join('.', 'models', '{}'.format(model_name))
 model.save(saved_model_dir)
