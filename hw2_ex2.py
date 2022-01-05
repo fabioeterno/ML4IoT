@@ -9,17 +9,13 @@ import pandas as pd
 import zlib
 import tensorflow_model_optimization as tfmot
 
-
 parser = argparse.ArgumentParser()
 parser.add_argument('--version', type=str, required=True, help='model name')
 args = parser.parse_args()
 
-
 seed = 42
 tf.random.set_seed(seed)
 np.random.seed(seed)
-
-
 
 zip_path = tf.keras.utils.get_file(
     origin="http://storage.googleapis.com/download.tensorflow.org/data/mini_speech_commands.zip",
@@ -37,7 +33,6 @@ num_samples = len(filenames)
 total = 8000
 
 # validation can be used only for hyperparameter tuning or earlystopping training    
-
 train_files = open("kws_train_split.txt", "r")
 train_files = tf.convert_to_tensor(train_files.read().splitlines())
 val_files = open("kws_val_split.txt", "r")
@@ -46,7 +41,6 @@ test_files = open("kws_test_split.txt", "r")
 test_files = tf.convert_to_tensor(test_files.read().splitlines())
 
 LABELS = ['stop', 'up', 'yes', 'right', 'left', 'no', 'down', 'go']
-
 
 class SignalGenerator:
     def __init__(self, labels, sampling_rate, frame_length, frame_step,
@@ -133,22 +127,12 @@ class SignalGenerator:
 
 
 STFT_OPTIONS = {'frame_length': 256, 'frame_step': 128, 'mfcc': False}
-#MFCC_OPTIONS = {'frame_length': 640, 'frame_step': 320, 'mfcc': True,
-#        'lower_frequency': 20, 'upper_frequency': 4000, 'num_mel_bins': 40,
-#        'num_coefficients': 10}
-
 MFCC_OPTIONS = {'frame_length': 640, 'frame_step': 320, 'mfcc': True,
         'lower_frequency': 20, 'upper_frequency': 4000, 'num_mel_bins': 40,
         'num_coefficients': 10}
 
-
-#if args.mfcc is True:
 options = MFCC_OPTIONS
 strides = [2, 1]
-#else:
-#    options = STFT_OPTIONS
-#    strides = [2, 2]
-
 
 generator = SignalGenerator(LABELS, 16000, **options)  
 train_ds = generator.make_dataset(train_files, True)
@@ -158,31 +142,29 @@ test_ds = generator.make_dataset(test_files, False)
 units = 8
 
 if args.version == 'a':
-    MFCC_OPTIONS = {'frame_length': 640, 'frame_step': 320, 'mfcc': True,
-        'lower_frequency': 20, 'upper_frequency': 4000, 'num_mel_bins': 40,
-        'num_coefficients': 10}
     # dscnn
     model_name = "Group3_kws_a.tflite.zip"
     model_name_nozip = "Group3_kws_a.tflite"
+    alpha = 0.8
     model = tf.keras.Sequential([
-                tf.keras.layers.Conv2D(filters=256, kernel_size=[3, 3], strides=strides, use_bias=False),
+                tf.keras.layers.Conv2D(filters=int(256*alpha), kernel_size=[3, 3], strides=strides, use_bias=False),
                 tf.keras.layers.BatchNormalization(momentum=0.1),
                 tf.keras.layers.ReLU(),
+                tf.keras.layers.Dropout(0.5),
                 tf.keras.layers.DepthwiseConv2D(kernel_size=[3, 3], strides=[1, 1], use_bias=False),
-                tf.keras.layers.Conv2D(filters=256, kernel_size=[1, 1], strides=[1, 1], use_bias=False),
+                tf.keras.layers.Conv2D(filters=int(256*alpha), kernel_size=[1, 1], strides=[1, 1], use_bias=False),
                 tf.keras.layers.BatchNormalization(momentum=0.1),
                 tf.keras.layers.ReLU(),
+                tf.keras.layers.Dropout(0.5),
                 tf.keras.layers.DepthwiseConv2D(kernel_size=[3, 3], strides=[1, 1], use_bias=False),
-                tf.keras.layers.Conv2D(filters=256, kernel_size=[1, 1], strides=[1, 1], use_bias=False),
+                tf.keras.layers.Conv2D(filters=int(256*alpha), kernel_size=[1, 1], strides=[1, 1], use_bias=False),
                 tf.keras.layers.BatchNormalization(momentum=0.1),
                 tf.keras.layers.ReLU(),
+                tf.keras.layers.Dropout(0.5),
                 tf.keras.layers.GlobalAveragePooling2D(),
                 tf.keras.layers.Dense(units=units)  
     ])
 if args.version == 'b':
-    MFCC_OPTIONS = {'frame_length': 640, 'frame_step': 320, 'mfcc': True,
-        'lower_frequency': 20, 'upper_frequency': 4000, 'num_mel_bins': 40,
-        'num_coefficients': 10}
     # dscnn + width multiplier (structured pruning) 
     model_name = "Group3_kws_b.tflite.zip" 
     model_name_nozip = "Group3_kws_b.tflite"
@@ -206,9 +188,6 @@ if args.version == 'b':
                 tf.keras.layers.Dense(units=units)  
     ]) 
 if args.version == 'c':
-    MFCC_OPTIONS = {'frame_length': 640, 'frame_step': 320, 'mfcc': True,
-        'lower_frequency': 20, 'upper_frequency': 4000, 'num_mel_bins': 40,
-        'num_coefficients': 10}
     # dscnn + width multiplier (structured pruning) 
     model_name = "Group3_kws_c.tflite.zip"  
     model_name_nozip = "Group3_kws_c.tflite"
@@ -231,70 +210,26 @@ if args.version == 'c':
                 tf.keras.layers.GlobalAveragePooling2D(),
                 tf.keras.layers.Dense(units=units)  
     ]) 
-    #pruning_params = {'pruning_schedule':
-    #                               tfmot.sparsity.keras.ConstantSparsity(
-    #                               target_sparsity=0.14
-    #                                   , begin_step=0, end_step=-1, frequency=100
-    #                            )
-    #                 }
-    #                         tfmot.sparsity.keras.PolynomialDecay(
-    #                            initial_sparsity=0.30,
-    #                            final_sparsity=0.8,
-    #                            begin_step=len(train_ds)*5,
-    #                            end_step=len(train_ds)*15
-    #                        )
-
-    #prune_low_magnitude = tfmot.sparsity.keras.prune_low_magnitude
-    #model = prune_low_magnitude(model, **pruning_params)
 
 # Compile the model
 loss = tf.losses.SparseCategoricalCrossentropy(from_logits=True)
 optimizer = tf.optimizers.Adam()
 metrics = [tf.metrics.SparseCategoricalAccuracy()]
 
-
-
 # Train the model
 if args.version == 'a':
     model.compile(loss=loss, optimizer=optimizer, metrics=metrics)
-    model.fit(train_ds, epochs=30, validation_data=val_ds)   
+    model.fit(train_ds, epochs=100, validation_data=val_ds) 
 if args.version == 'b':
     model.compile(loss=loss, optimizer=optimizer, metrics=metrics)
-    model.fit(train_ds, epochs=100, validation_data=val_ds)  
-#if args.version == 'c':
-#    model.compile(loss=loss, optimizer=optimizer, metrics=metrics)
-#    model.fit(train_ds, epochs=100, validation_data=val_ds)
-
-#print(model.summary())
-# Evaluate the model
-#loss, error = model.evaluate(test_ds)
-    
-# Weights clustering
-if args.version == 'a':
-    model = tfmot.clustering.keras.cluster_weights(
-                model,
-                number_of_clusters=25,
-                cluster_centroids_init = tfmot.clustering.keras.CentroidInitialization.LINEAR
-    )
-    model = tfmot.clustering.keras.strip_clustering(model)
-    print(model.summary())
-    # Evaluate the model
-    loss, error = model.evaluate(test_ds)
-if args.version == 'b':
-    print(model.summary())
-    # Evaluate the model
-    loss, error = model.evaluate(test_ds)
+    model.fit(train_ds, epochs=100, validation_data=val_ds)
 if args.version == 'c':
     model.compile(loss=loss, optimizer=optimizer, metrics=metrics)
-    #callbacks = [tfmot.sparsity.keras.UpdatePruningStep()]
-    #input_shape = [32, 49, 10, 1]
-    #model.build(input_shape)
-    #model.fit(train_ds, epochs=100, validation_data=val_ds, callbacks=callbacks)
     model.fit(train_ds, epochs=300, validation_data=val_ds)
-    print(model.summary())
-    # Evaluate the model
-    loss, error = model.evaluate(test_ds)
-    #model = tfmot.sparsity.keras.strip_pruning(model)       
+    
+print(model.summary())
+# Evaluate the model
+loss, error = model.evaluate(test_ds)
 
 saved_model_dir = os.path.join('.', 'models', '{}'.format(model_name))
 model.save(saved_model_dir)
@@ -336,8 +271,7 @@ with open(model_name_nozip, 'wb') as f:
 tflite_decompressed = open(name_tflite_model_quant, 'rb').read()
 tflite_decompressed = zlib.decompress(tflite_decompressed)    
     
-#interpreter = tflite.Interpreter(model_path=name_tflite_model_quant)
-interpreter = tflite.Interpreter(model_content=tflite_decompressed)
+interpreter = tflite.Interpreter(model_path=model_name_nozip)
 interpreter.allocate_tensors()
 
 input_details = interpreter.get_input_details()
