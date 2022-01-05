@@ -186,7 +186,7 @@ if args.version == 'b':
     # dscnn + width multiplier (structured pruning) 
     model_name = "Group3_kws_b.tflite.zip" 
     model_name_nozip = "Group3_kws_b.tflite"
-    alpha = 0.47
+    alpha = 0.44
     model = tf.keras.Sequential([
                 tf.keras.layers.Conv2D(filters=int(256*alpha), kernel_size=[3, 3], strides=strides, use_bias=False),
                 tf.keras.layers.BatchNormalization(momentum=0.1),
@@ -276,6 +276,7 @@ if args.version == 'a':
                 number_of_clusters=25,
                 cluster_centroids_init = tfmot.clustering.keras.CentroidInitialization.LINEAR
     )
+    model = tfmot.clustering.keras.strip_clustering(model)
     print(model.summary())
     # Evaluate the model
     loss, error = model.evaluate(test_ds)
@@ -293,8 +294,6 @@ if args.version == 'c':
     # Evaluate the model
     loss, error = model.evaluate(test_ds)
     model = tfmot.sparsity.keras.strip_pruning(model)       
-        
-model = tfmot.clustering.keras.strip_clustering(model)
 
 saved_model_dir = os.path.join('.', 'models', '{}'.format(model_name))
 model.save(saved_model_dir)
