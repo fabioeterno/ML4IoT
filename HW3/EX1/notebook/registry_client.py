@@ -5,32 +5,18 @@ import tensorflow as tf
 import tensorflow.lite as tflite
 from tensorflow import keras
 import base64
+import json
 
-#parser = argparse.ArgumentParser()
-#parser.add_argument('model', nargs=1, type=str)
-#args = parser.parse_args()
-
-def response(r):
-    if r.status_code == 200:
-    #    body = r.json()
-         print(r)
-    #    string = commands[body['command']].join(map(str, operands))
-    #    print(string, '=', body['result'])
-    else:
-        print('Error:', r.status_code)
 
 #model_name = args.model[0]
 model_name = 'mlp'
 
 # LOADING THE SAVED MODEL 
 new_model = tf.keras.models.load_model('models_source/{}'.format(model_name))
-# Check its architecture
-#new_model.summary()
 
 # Converting saved model to TFLite model
 converter = tf.lite.TFLiteConverter.from_saved_model('models_source/{}'.format(model_name))
 tflite_model = converter.convert()
-
 
 # Saving the TFLite model on disk
 name_tflite_model = os.path.join('./models_source/', '{}.tflite'.format(model_name))
@@ -44,14 +30,22 @@ model_string = model_b64bytes.decode()
 
 url = 'http://0.0.0.0:8080/'
 
+# TESTING ADD PATH RESPONSE
 url_add = os.path.join(url,'add/')
 body = {'name': model_name, 'model': model_string}
 # Conversion in json of the body
-r = requests.put(url_add, json=body)
-response(r)
+r = requests.post(url_add, json=body)
+if r.status_code == 200:
+    print(r)
+else:
+    print('Error:', r.status_code)
 
-    
+# TESTING LIST PATH RESPONSE    
 url_list = os.path.join(url,'list/')
 r = requests.get(url_list)
-response(r)
+
+if r.status_code == 200:
+    print("Registered models: ", r.content.decode())
+else:
+    print('Error:', r.status_code)
 
