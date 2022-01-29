@@ -31,11 +31,6 @@ filenames = tf.random.shuffle(filenames)
 
 num_samples = len(filenames)
 
-#total = 8000
-#train_files = filenames[:int(total*0.8)]
-#val_files = filenames[int(total*0.8): int(total*0.9)]
-#test_files = filenames[int(total*0.9):]
-
 LABELS = ['stop', 'up', 'yes', 'right', 'left', 'no', 'down', 'go']
 
 class SignalGenerator:
@@ -126,10 +121,6 @@ class SignalGenerator:
 
         return ds
 
-#MFCC_OPTIONS = {'frame_length': 640, 'frame_step': 320, 'mfcc': True,
-#        'lower_frequency': 20, 'upper_frequency': 4000, 'num_mel_bins': 40,
-#        'num_coefficients': 10}
-
 MFCC_OPTIONS = {'frame_length': 600, 'frame_step': 300, 'mfcc': True,
         'lower_frequency': 20, 'upper_frequency': 4000, 'num_mel_bins': 40,
         'num_coefficients': 10}
@@ -140,8 +131,7 @@ strides = [2, 1]
 
 generator = SignalGenerator(LABELS, 15000, **options)
 
-#train_ds = generator.make_dataset(train_files, True)
-#val_ds = generator.make_dataset(val_files, False)
+
 dataset = generator.make_dataset(filenames, False)
 
 units = 8
@@ -152,7 +142,7 @@ interpreter.allocate_tensors()
 
 input_details = interpreter.get_input_details()
 output_details = interpreter.get_output_details()
-#print(output_details)    
+   
 dataset = dataset.unbatch().batch(1)
 
 correct = 0.0
@@ -162,28 +152,23 @@ size_json = 0
 
 for elem in dataset:
     
-    #tf.reshape(mfccs, [1,  self.num_frames, self.num_coefficients, 1])
     #input_tensor = tf.reshape(elem[0], [1,  num_frames, num_coefficients, 1])
     interpreter.set_tensor(input_details[0]['index'], elem[0])
     interpreter.invoke()
 
     predicted = interpreter.get_tensor(output_details[0]['index'])
-    #print(predicted[0])
     tmp = tf.math.softmax(predicted)*100
-    #print(tmp.numpy()[0])
-    print([ np.round(x, 2) for x in tmp.numpy()[0] ])
+
+    #print([ np.round(x, 2) for x in tmp.numpy()[0] ])
     index = np.argmax(predicted[0])
-    print("predicted: ", LABELS[index], index)
-    print("true value: ", LABELS[elem[1][0]], elem[1][0].numpy() )
+    #print("predicted: ", LABELS[index], index)
+    #print("true value: ", LABELS[elem[1][0]], elem[1][0].numpy() )
     
-    #print(elem[0])
     
     # ENCODING THE MODEL FROM BASE64 BYTES INTO STRING
     elem_serial = tf.io.serialize_tensor(elem[0])
     audio_b64bytes = base64.b64encode(elem_serial.numpy())
     audio_string = audio_b64bytes.decode() 
-    
-    #print(audio_string)
     
     url = 'http://127.0.0.1:8080/'
     
@@ -202,9 +187,9 @@ for elem in dataset:
         print("predicted: ", LABELS[int(response['l'])], int(response['l']))
     else:
         print('Error:', r.status_code)
-    print(size_json)
-    print(index, elem[1][0].numpy())
-    sys.exit()
+    #print(size_json)
+    #print(index, elem[1][0].numpy())
+    #sys.exit()
     
     # the index predicted is equal to the index of the true label in test_ds elem[1][0]
     if index==elem[1][0]:
@@ -217,112 +202,4 @@ print()
 print("Accuracy: " + str('{0:.3f}%'.format(correct/total)))    
 print("Communication Cost: " + str('{0:.3f}%'.format(size_json*1000)) + "MB")   
 print()
-
-sys.exit()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#model_name = args.model[0]
-model_name = '2_cnn'
-
-
-# Converting saved model to TFLite model
-converter = tf.lite.TFLiteConverter.from_saved_model('models_source/{}'.format(model_name))
-tflite_model = converter.convert()
-
-# Saving the TFLite model on disk
-name_tflite_model = os.path.join('./models_source/', '{}.tflite'.format(model_name))
-with open(name_tflite_model, 'wb') as f:
-    f.write(tflite_model)
-
-# ENCODING THE MODEL FROM BASE64 BYTES INTO STRING
-model_b64bytes = base64.b64encode(tflite_model)
-model_string = model_b64bytes.decode() 
-#print(model_string)
-
-url = 'http://127.0.0.1:8080/'
-
-# TESTING ADD PATH RESPONSE
-url_add = os.path.join(url,'add/')
-body = {'model': model_name, 'model_string': model_string}
-# Conversion in json of the body
-r = requests.post(url_add, json=body)
-if r.status_code == 200:
-    print(r)
-else:
-    print('Error:', r.status_code)
-
-# TESTING LIST PATH RESPONSE    
-url_list = os.path.join(url,'list/')
-r = requests.get(url_list)
-
-if r.status_code == 200:
-    print(r)
-    print("Registered models: ", r.content.decode())
-else:
-    print('Error:', r.status_code)
-
-
-# TESTING PREDICT RESPONSE    
-tthres = 0.2
-hthres = 0.3
-body = {'model': model_name, 'tthres':tthres, 'hthres':hthres}
-url_predict = os.path.join(url, 'predict/')
-r = requests.post(url_predict, json = body)
-
-if r.status_code == 200:
-    print(r)
-    print("Pred: ", r.content.decode())
-else:
-    print('Error:', r.status_code)
 
