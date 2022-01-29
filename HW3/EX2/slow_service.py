@@ -31,14 +31,15 @@ class Registry(object):
             # # convert string into dictionary
             body = json.loads(body)
    
-            audio_str = body.get('audio')
+            e = body.get('e')
+            audio_str = e['v']
             # DECODING THE MODEL FROM STRING INTO BASE64 BYTES
             audio_b64bytes = audio_str.encode()
             audio = base64.b64decode(audio_b64bytes)
             
             audio = tf.io.parse_tensor(audio, out_type=tf.float32)
-            print(type(audio))
-            print(audio)
+            #print(type(audio))
+            #print(audio)
 
 
             
@@ -59,8 +60,11 @@ class Registry(object):
             print([ np.round(x, 2) for x in tmp.numpy()[0] ])
             index = np.argmax(predicted[0])
             print("predicted: ", LABELS[index], index)
+            
 
-            #return json.dumps(body)
+            label = {"l" : str(index)}
+            
+            return json.dumps(label)
 
         except Exception as E:
             print(E)

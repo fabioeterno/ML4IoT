@@ -11,6 +11,8 @@ from scipy import signal
 import numpy as np
 import base64
 import requests
+from datetime import datetime
+import json
 
 model_name = 'kws_dscnn_True'
 num_frames = 49
@@ -156,6 +158,8 @@ dataset = dataset.unbatch().batch(1)
 correct = 0.0
 total = 0.0
 
+size_json = 0
+
 for elem in dataset:
     
     #tf.reshape(mfccs, [1,  self.num_frames, self.num_coefficients, 1])
@@ -172,25 +176,34 @@ for elem in dataset:
     print("predicted: ", LABELS[index], index)
     print("true value: ", LABELS[elem[1][0]], elem[1][0].numpy() )
     
-    print(elem[0])
+    #print(elem[0])
     
     # ENCODING THE MODEL FROM BASE64 BYTES INTO STRING
     elem_serial = tf.io.serialize_tensor(elem[0])
     audio_b64bytes = base64.b64encode(elem_serial.numpy())
     audio_string = audio_b64bytes.decode() 
     
-    print(audio_string)
+    #print(audio_string)
     
     url = 'http://127.0.0.1:8080/'
-    body = {'audio': audio_string}
+    
+
+    now = int(round(datetime.now().timestamp()))
+    e = {"n" : "audio" , "t" : now, "v" : audio_string, "u" : "tensor"}
+    body = {'e': e}
     
     # Conversion in json of the body
     r = requests.post(url, json=body)
     if r.status_code == 200:
         print(r)
+        response = json.loads(r.content.decode())
+        print ("Estimated size: " + str(sys.getsizeof(response) / 1024) + " KB")
+        size_json += (sys.getsizeof(response) / 1024)
+        print("predicted: ", LABELS[int(response['l'])], int(response['l']))
     else:
         print('Error:', r.status_code)
-    
+    print(size_json)
+    print(index, elem[1][0].numpy())
     sys.exit()
     
     # the index predicted is equal to the index of the true label in test_ds elem[1][0]
@@ -201,7 +214,8 @@ for elem in dataset:
 
 
 print()    
-print("TFLite quantized accuracy: " + str('{0:.10f}'.format(correct/total)))    
+print("Accuracy: " + str('{0:.3f}%'.format(correct/total)))    
+print("Communication Cost: " + str('{0:.3f}%'.format(size_json*1000)) + "MB")   
 print()
 
 sys.exit()
