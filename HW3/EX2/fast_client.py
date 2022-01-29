@@ -9,10 +9,8 @@ import pandas as pd
 from scipy.io import wavfile
 from scipy import signal
 import numpy as np
-
-seed = 42
-tf.random.set_seed(seed)
-np.random.seed(seed)
+import base64
+import requests
 
 model_name = 'kws_dscnn_True'
 num_frames = 49
@@ -173,6 +171,26 @@ for elem in dataset:
     index = np.argmax(predicted[0])
     print("predicted: ", LABELS[index], index)
     print("true value: ", LABELS[elem[1][0]], elem[1][0].numpy() )
+    
+    print(elem[0])
+    
+    # ENCODING THE MODEL FROM BASE64 BYTES INTO STRING
+    elem_serial = tf.io.serialize_tensor(elem[0])
+    audio_b64bytes = base64.b64encode(elem_serial.numpy())
+    audio_string = audio_b64bytes.decode() 
+    
+    print(audio_string)
+    
+    url = 'http://127.0.0.1:8080/'
+    body = {'audio': audio_string}
+    
+    # Conversion in json of the body
+    r = requests.post(url, json=body)
+    if r.status_code == 200:
+        print(r)
+    else:
+        print('Error:', r.status_code)
+    
     sys.exit()
     
     # the index predicted is equal to the index of the true label in test_ds elem[1][0]
