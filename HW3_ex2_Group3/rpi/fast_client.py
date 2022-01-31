@@ -16,8 +16,6 @@ import json
 import time
 
 model_name = 'kws_dscnn_True'
-num_frames = 49
-num_coefficients = 10
 
 zip_path = tf.keras.utils.get_file(
     origin="http://storage.googleapis.com/download.tensorflow.org/data/mini_speech_commands.zip",
@@ -159,32 +157,23 @@ print("dataset: ", dataset)
 
 for elem in dataset:
 
-    #input_tensor = tf.reshape(elem[0], [1,  num_frames, num_coefficients, 1])
     interpreter.set_tensor(input_details[0]['index'], elem[0])
     interpreter.invoke()
 
     predicted = interpreter.get_tensor(output_details[0]['index'])
     probabilities = tf.math.softmax(predicted)*100
 
-    #print([ np.round(x, 2) for x in probabilities.numpy()[0] ])
     index = np.argmax(predicted[0])
-    #print("predicted: ", LABELS[index], index)
-    #print("true value: ", LABELS[elem[1][0]], elem[1][0].numpy() )
 
     # SUCCESS CHECKER IMPLEMENTATION
-    #print()
-    #print(np.argmax(probabilities[0]))
-    #print(np.argsort(np.max(probabilities, axis=0))[-2])
     index_first_largest_prob = np.argmax(probabilities[0])
     index_second_largest_prob = np.argsort(np.max(probabilities, axis=0))[-2]
 
-    #print(probabilities.numpy()[0][index_first_largest_prob])
-    #print(probabilities.numpy()[0][index_second_largest_prob])
     # IF THE SCORE MARGIN IS LOWER THAN 20 SEND DATA TO THE CLOUD
     if probabilities.numpy()[0][index_first_largest_prob] - probabilities.numpy()[0][index_second_largest_prob] < 20:
         print("**********************************")
         print(probabilities.numpy()[0][index_first_largest_prob], probabilities.numpy()[0][index_second_largest_prob])
-        #sys.exit()
+
 
         # ENCODING THE TENSOR FROM BASE64 BYTES INTO STRING
         elem_serial = tf.io.serialize_tensor(elem[0])
@@ -203,15 +192,11 @@ for elem in dataset:
         if r.status_code == 200:
             print(r)
             response = json.loads(r.content.decode())
-            #print ("Estimated size: " + str(sys.getsizeof(response) / 1024) + " KB")
             size_json += (sys.getsizeof(response) / 1024)
             print("predicted: ", LABELS[int(response['l'])], int(response['l']))
             print("true value: ", LABELS[elem[1][0]], elem[1][0].numpy() )
         else:
             print('Error:', r.status_code)
-        #print(size_json)
-        #print(index, elem[1][0].numpy())
-        #sys.exit()
 
     # the index predicted is equal to the index of the true label in test_ds elem[1][0]
     if index==elem[1][0]:
@@ -224,6 +209,5 @@ end = time.time()
 print()
 print("Accuracy: " + str('{0:.3f}%'.format(correct/total)))    
 print("Communication Cost: " + str('{0:.3f}'.format(size_json/1000)) + " MB") 
-#print('Latency {:.2f}ms'.format((end - start)*1000/len(test_files)))
 print()
 
