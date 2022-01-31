@@ -25,7 +25,7 @@ class Registry(object):
     def POST(self, *path, **query):
         try:
             
-            #read the body
+            #read the bodyx
             body = cherrypy.request.body.read()
             
             # # convert string into dictionary
@@ -33,7 +33,7 @@ class Registry(object):
    
             e = body.get('e')
             audio_str = e['v']
-            # DECODING THE MODEL FROM STRING INTO BASE64 BYTES
+            # DECODING THE TENSOR FROM STRING INTO BASE64 BYTES
             audio_b64bytes = audio_str.encode()
             audio = base64.b64decode(audio_b64bytes)
             
@@ -79,7 +79,7 @@ class Registry(object):
 if __name__ == '__main__':
     conf = {'/': {'request.dispatch': cherrypy.dispatch.MethodDispatcher()}}
     cherrypy.tree.mount(Registry(), '', conf)
-    cherrypy.config.update({'server.socket_host': '127.0.0.1'})
+    cherrypy.config.update({'server.socket_host': '192.168.137.1'})
     cherrypy.config.update({'server.socket_port': 8080})
     cherrypy.engine.start()
     cherrypy.engine.block()

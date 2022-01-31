@@ -9,10 +9,8 @@ import json
 
 
 #model_name = args.model[0]
-model_name = 'mlp'
+model_name = '2_cnn'
 
-# LOADING THE SAVED MODEL 
-new_model = tf.keras.models.load_model('models_source/{}'.format(model_name))
 
 # Converting saved model to TFLite model
 converter = tf.lite.TFLiteConverter.from_saved_model('models_source/{}'.format(model_name))
@@ -28,11 +26,11 @@ model_b64bytes = base64.b64encode(tflite_model)
 model_string = model_b64bytes.decode() 
 #print(model_string)
 
-url = 'http://0.0.0.0:8080/'
+url = 'http://192.168.137.100:8080/'
 
 # TESTING ADD PATH RESPONSE
 url_add = os.path.join(url,'add/')
-body = {'name': model_name, 'model': model_string}
+body = {'model': model_name, 'model_string': model_string}
 # Conversion in json of the body
 r = requests.post(url_add, json=body)
 if r.status_code == 200:
@@ -45,7 +43,22 @@ url_list = os.path.join(url,'list/')
 r = requests.get(url_list)
 
 if r.status_code == 200:
+    print(r)
     print("Registered models: ", r.content.decode())
+else:
+    print('Error:', r.status_code)
+
+
+# TESTING PREDICT RESPONSE    
+tthres = 0.2
+hthres = 0.3
+body = {'model': model_name, 'tthres':tthres, 'hthres':hthres}
+url_predict = os.path.join(url, 'predict/')
+r = requests.post(url_predict, json = body)
+
+if r.status_code == 200:
+    print(r)
+    print("Pred: ", r.content.decode())
 else:
     print('Error:', r.status_code)
 
